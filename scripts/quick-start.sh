@@ -1,21 +1,25 @@
 #!/bin/bash
 
-set -e
+# FIXME MinGW makes a whole new context when running this script 
+# Which causes a mess.
 
-OS="no-os"
+
+set -e
 
 # Detecting which OS the host is using.
 detect_os() {
-    # Try using windows or linux command.
-    OS=$(systeminfo | findstr /B /C:"OS Name") || OS=`uname -a`
+    uname -a
 
+    # Try using windows or linux command.
+    OS=$(systeminfo | findstr /B /C:"OS Name") || OS=`wsl uname`
+    uname -a
     #FIX Clear the erros considering >2/dev/null doesn't work...
 
     if [[ $OS=='Linux' ]]; then
         echo "Linux Operating System Detected: $OS"
         build_engine_linux
     else
-        echo "Winodws Operating System Detected: $OS"
+        echo "Windows Operating System Detected: $OS"
         build_engine_windows
     fi
 
@@ -43,7 +47,6 @@ run_engine_windows() {
 
 main() {
     detect_os
-    build_engine
 }
 
 main

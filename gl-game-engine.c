@@ -15,6 +15,7 @@
 #define pixelScale  4/res               // OpenGL pixel scale
 #define GLSW        (SW*pixelScale)     // OpenGL window width.
 #define GLSH        (SH*pixelScale)     // OpenGL window height.
+#define M_PI        3.14159265          // Stores Pi
 /*----------------------------------------------------------------*/
 
 typedef struct
@@ -29,9 +30,20 @@ typedef struct
     int m;          // Move up, down, look up, down.
 } keys; keys K;
 
-/*-----------------------------------------------------------------*/
+typedef struct
+{
+    float cos[360]; // Save sin and cos values from 0-360degrees.
+    float sin[360];
+} math; math M;
 
-int tick;
+typedef struct
+{
+    int x, y, z; // Player position. Z is up
+    int a;       // Player angle of rotation from left to right.
+    int l;       // Variable to look up and down.
+} player; player P;
+
+/*-----------------------------------------------------------------*/
 
 void pixel(int x, int y, int c)         // Draw a pixel at x/y with rgb.
 {
@@ -55,47 +67,114 @@ void pixel(int x, int y, int c)         // Draw a pixel at x/y with rgb.
 
 void movePlayer()
 {
-    // Move left, right, up, and down.
-    if (K.a == 1 && K.m == 0) { printf("left\n"); }
-    if (K.d == 1 && K.m == 0) { printf("right\n"); }
-    if (K.w == 1 && K.m == 0) { printf("up\n"); }
-    if (K.s == 1 && K.m == 0) { printf("down\n"); }
+    // Move left.
+    if (K.a == 1 && K.m == 0) {
+        P.a-=4;
+        if (P.a < 0) { P.a+=360; }; // Loop back around incase of zero. (Look-up array)
+    }
 
-    // Strafe left and right.
-    if (K.sr == 1) { printf("strafe left\n"); }
-    if (K.sl == 1) { printf("strafe right\n"); }
+    // Move Right.
+    if (K.d == 1 && K.m == 0) { 
+        P.a+=4;
+        if (P.a > 359) { P.a-=360; }; // Loop back around at max value. (Look-up array)
+     }
 
-    // Look left, right, up, and down.
-    if (K.a == 1 && K.m == 1) { printf("Look left\n"); }
-    if (K.d == 1 && K.m == 1) { printf("Look right\n"); }
-    if (K.w == 1 && K.m == 1) { printf("Look up\n"); }
-    if (K.s == 1 && K.m == 1) { printf("Look down\n"); }
+    // Player needs to move with a vector. (Push and Pull)
+    int dx=M.sin[P.a]*10.0;
+    int dy=M.cos[P.a]*10.0;
+
+    // Move Forwards.
+    if (K.w == 1 && K.m == 0) { 
+        P.x+=dx;
+        P.y+=dy;
+     }
+     
+     // Move Backwards.
+    if (K.s == 1 && K.m == 0) { 
+        P.x-=dx;
+        P.y-=dy;
+    }
+
+    // Strafe Left.
+    if (K.sr == 1) { 
+        P.x+=dy;
+        P.y-=dx;
+     }
+
+     // Strafe Right.
+    if (K.sl == 1) { 
+        P.x-=dy;
+        P.y-=dx;
+     }
+
+    // Look Left.
+    if (K.a == 1 && K.m == 1) { 
+        P.l-=1;
+     }
+
+    // Look Right.
+    if (K.d == 1 && K.m == 1) { 
+        P.l+=1;
+    }
+
+    // Look Up.
+    if (K.w == 1 && K.m == 1) { 
+        P.z-=4;
+     }
+
+    // Look Down.
+    if (K.s == 1 && K.m == 1) { 
+        P.z+=4;
+     }
 }
 
 void clearBackground()
 {
     int x, y;
-    for (y=0; y<SH; y++) {
-        for (x=0; x<SW; x++) { pixel(x, y, 8); } // Clear background color.
+
+    for (y=0; y<SH; y++) { // Clear background color.
+        for (x=0; x<SW; x++) { 
+            pixel(x, y, 8); 
+        } 
     }
 }
 
 void draw3D()
 {
-    int x, y, c=0;
-    
-    for (y=0; y<SH2; y++) {
-        for (x=0; x<SW2; x++) {
-            pixel(x, y, c);
-            c+=1; 
-            if (c>8) { c=0; }
-        }
+    int wx[4], wy[4], wz[4]; // x,y,z for the wall.
+    float CS=M.cos[P.a], SN=M.sin[P.a]; // Hold cos and sin value based on player rotation.
+
+    // Offset bottom 2 points by player.
+    int x1=40-P.x, y1= 10-P.y;
+    int x2=40-P.x, y2=290-P.y;
+
+    // World X position.
+    wx[0] = (x1 * CS) - (y1 * SN);
+    wx[1] = (x2 * CS) - (y2 * SN);
+
+    // World Y position. (depth)
+    wy[0] = (y1 * CS) + (x1 * SN);
+    wy[1] = (y2 * CS) + (x2 * SN);
+
+    // World Z height.
+    wz[0] = 0 - P.z + ((P.l*wy[0])/32.0);
+    wz[1] = 0 - P.z + ((P.l*wy[1])/32.0);
+
+    // Screen x and screen y position.
+    // 200 : Field of view.
+    wx[0] = wx[0] * 200/wy[0] + SW2;
+    wy[0] = wz[0] * 200/wy[0] + SH2;
+    wx[1] = wx[1] * 200/wy[1] + SW2;
+    wy[1] = wz[1] * 200/wy[1] + SH2;
+
+    // Draw points.
+    if ( wx[0]>0 && wx[0]<SW && wy[0]>0 && wy[0]<SH ) {
+        pixel(wx[0], wy[0], 0);
     }
-    
-    // Frame rate.
-    tick+=1; 
-    if (tick>20) { tick=0; } 
-    pixel(SW2, SH2+tick, 0);
+
+    if ( wx[1]>1 && wx[1]<SW && wy[1]>0 && wy[1]<SH ) {
+        pixel(wx[1], wy[1], 0);
+    }
 }
 
 // Renders display
@@ -120,27 +199,37 @@ void display()
 void KeysDown(unsigned char key, int x, int y)
 {
     if (key == 'w' == 1) { K.w = 1; }
-    if (key == 's' == 1) { K.w = 1; }
-    if (key == 'a' == 1) { K.w = 1; }
-    if (key == 'd' == 1) { K.w = 1; }
-    if (key == 'm' == 1) { K.w = 1; }
-    if (key == ',' == 1) { K.w = 1; }
-    if (key == '.' == 1) { K.w = 1; }
+    if (key == 's' == 1) { K.s = 1; }
+    if (key == 'a' == 1) { K.a = 1; }
+    if (key == 'd' == 1) { K.d = 1; }
+    if (key == 'm' == 1) { K.m = 1; }
+    if (key == ',' == 1) { K.sr = 1; }
+    if (key == '.' == 1) { K.sl = 1; }
 }
 
 void KeysUp(unsigned char key, int x, int y)
 {
     if (key == 'w' == 1) { K.w = 0; }
-    if (key == 's' == 1) { K.w = 0; }
-    if (key == 'a' == 1) { K.w = 0; }
-    if (key == 'd' == 1) { K.w = 0; }
-    if (key == 'm' == 1) { K.w = 0; }
-    if (key == ',' == 1) { K.w = 0; }
-    if (key == '.' == 1) { K.w = 0; }
+    if (key == 's' == 1) { K.s = 0; }
+    if (key == 'a' == 1) { K.a = 0; }
+    if (key == 'd' == 1) { K.d = 0; }
+    if (key == 'm' == 1) { K.m = 0; }
+    if (key == ',' == 1) { K.sr = 0; }
+    if (key == '.' == 1) { K.sl = 0; }
 }
 
+// Used to initialize variables.
 void init()
 {
+    // Precalculating sin and cos in degrees and storing the values.
+    for (int x=0; x<360; x++) 
+    {
+        M.cos[x]=cos(x/180.0*M_PI);
+        M.sin[x]=sin(x/180.0*M_PI);
+    }
+
+    // Init player position variables
+    P.x=70; P.y=-110; P.z=20; P.a=0; P.l=0;
 }
 
 int main(int argc, char* argv[])
@@ -152,9 +241,9 @@ int main(int argc, char* argv[])
     glutCreateWindow("");
     glPointSize(pixelScale); // Pixel Size.
     gluOrtho2D(0, GLSW, 0, GLSH); // Origin Bottom Left.
-    
 
-    init(); // Placeholder for now.
+    init();
+    printf("Running...\n");
 
     glutDisplayFunc(display);
     glutKeyboardFunc(KeysDown);
