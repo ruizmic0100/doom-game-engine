@@ -45,7 +45,7 @@ void pixel(int x, int y, int c)         // Draw a pixel at x/y with rgb.
     if (c==5) { rgb[0]=  0; rgb[1]=160; rgb[2]=160;} // Cyan Darker.
     if (c==6) { rgb[0]=160; rgb[1]=100; rgb[2]=  0;} // Brown.
     if (c==7) { rgb[0]=110; rgb[1]= 50; rgb[2]=  0;} // Brown Darker.
-    if (c==8) { rgb[0]=60; rgb[1]= 60; rgb[2]=130;} // Background
+    if (c==8) { rgb[0]= 60; rgb[1]= 60; rgb[2]=130;} // Background
 
     glColor3ub(rgb[0], rgb[1], rgb[2]);
     glBegin(GL_POINTS);
@@ -108,7 +108,7 @@ void display()
         movePlayer();
         draw3D();
 
-        T.fr2 = t.fr1;
+        T.fr2 = T.fr1;
         glutSwapBuffers();
         glutReshapeWindow(GLSW, GLSH);          // Prevent window scaling.
     }
@@ -147,7 +147,7 @@ int main(int argc, char* argv[])
 {
     glutInit(&argc, argv); // Init with arguments.
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
-    glutInitWindowPositon(GLSW/2, GLSH/2);
+    glutInitWindowPosition(GLSW/2, GLSH/2);
     glutInitWindowSize(GLSW, GLSH);
     glutCreateWindow("");
     glPointSize(pixelScale); // Pixel Size.
@@ -163,14 +163,3 @@ int main(int argc, char* argv[])
 
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
