@@ -9,9 +9,12 @@
 
 #include <math.h>
 #include <stdio.h>
+
 #include <GL/glut.h>
 #include <GL/gl.h>
 #include <GL/glu.h>
+
+#include "../include/doom_level.h"
 
 
 
@@ -24,9 +27,23 @@
 #define pixelScale  4/res               // OpenGL pixel scale
 #define GLSW        (SW*pixelScale)     // OpenGL window width.
 #define GLSH        (SH*pixelScale)     // OpenGL window height.
-#define numSect     4                   // Number of sectors.
-#define numWall     16                  // Number of walls.
+#define numSect     10                   // Number of sectors.
+#define numWall     52                  // Number of walls.
+
+int window;
 /*-----------------------------Screen Config--------------------------------*/
+
+/*-----------------------------Input Config---------------------------------*/
+#define MB_LEFT 0
+#define LMB_PRESSED (1<<0)
+#define LMB_CLICKED (1<<16)
+#define MB_PRESSED(state, button) (1<<(button))
+#define MB_CLICKED(state, button) (1<<((button) + 16)))
+#define MB_MASK_PRESSED 0x0000ffffL
+#define MB_MASK_CLICKED 0xffff0000L
+
+uint32_t mouse_status = 0;
+/*-----------------------------Input Config---------------------------------*/
 
 typedef struct
 {
@@ -38,6 +55,7 @@ typedef struct
     int w,s,a,d;    // Move up, down, left, right.
     int sl,sr;      // Strafe left, right.
     int m;          // Look up, down.
+    int escape;     // Leave game.
 } keys; keys K;
 
 typedef struct
@@ -70,8 +88,24 @@ typedef struct
     int surface;    // Is there a surface to draw.
 } sectors; sectors S[30];
 
+int leftMouseButtonDown = GLUT_UP; // Setting default for left mouse click.
 
 /*-----------------------------------------------------------------*/
+
+// Handle closing the game properly.
+void closeGame() {
+    // Reset Key Values;
+    K.a = 0;
+    K.s = 0;
+    K.d = 0;
+    K.w = 0;
+    K.m = 0;
+    K.sl = 0;
+    K.sr = 0;
+    K.escape = 0;
+
+    glutDestroyWindow(window);
+}
 
 void pixel(int x, int y, int c)         // Draw a pixel with color (c) at x/y.
 {
@@ -339,7 +373,7 @@ void draw3D()
 }
 
 // Renders display
-void display()
+void display(void)
 {
     int x, y;
 
@@ -366,6 +400,7 @@ void KeysDown(unsigned char key, int x, int y)
     if (key == 'm' == 1) { K.m = 1; }
     if (key == ',' == 1) { K.sr = 1; }
     if (key == '.' == 1) { K.sl = 1; }
+    if (key == 27 == 1) { K.escape = 1; printf("Exitting...\n"); closeGame();}
 }
 
 void KeysUp(unsigned char key, int x, int y)
@@ -377,44 +412,47 @@ void KeysUp(unsigned char key, int x, int y)
     if (key == 'm' == 1) { K.m = 0; }
     if (key == ',' == 1) { K.sr = 0; }
     if (key == '.' == 1) { K.sl = 0; }
+    if (key == 27 == 1) { K.escape = 0;}
 }
 
-// Update this when updating struct sectors.
-int loadSectors[] =
-{ // wall start, wall end, z1 height, z2 height, bottom color, top color
-    0,  4,  0,  40, 2,  3, // Sector 1
-    4,  8,  0,  40, 4,  5, // Sector 2
-    8,  12, 0,  40, 6,  7, // Sector 3
-    12, 16, 0,  40, 0,  1, // Sector 4
-};
 
-int loadWalls[] =
-{ // x1, y1, x2, y2, color
-    0,  0,  32, 0,  0,
-    32, 0,  32, 32, 1,
-    32, 32, 0,  32, 0,
-    0,  32, 0,  0,  1,
+// // Update this when updating struct sectors.
+// int loadSectors[] =
+// { // wall start, wall end, z1 height, z2 height, bottom color, top color
+//     0,  4,  0,  40, 2,  3, // Sector 1
+//     4,  8,  0,  40, 4,  5, // Sector 2
+//     8,  12, 0,  40, 6,  7, // Sector 3
+//     12, 16, 0,  40, 0,  1, // Sector 4
+// };
 
-    64, 0,  96, 0,  2,
-    96, 0,  96, 32, 3,
-    96, 32, 64, 32, 2,
-    64, 32, 64, 0,  3,
+// int loadWalls[] =
+// { // x1, y1, x2, y2, color
+//     0,  0,  32, 0,  0,
+//     32, 0,  32, 32, 1,
+//     32, 32, 0,  32, 0,
+//     0,  32, 0,  0,  1,
 
-    64, 64, 96, 64, 4,
-    96, 64, 96, 96, 5,
-    96, 96, 64, 96, 4,
-    64, 96, 64, 64, 5,
+//     64, 0,  96, 0,  2,
+//     96, 0,  96, 32, 3,
+//     96, 32, 64, 32, 2,
+//     64, 32, 64, 0,  3,
 
-    0,  64, 32, 64, 6,
-    32, 64, 32, 96, 7,
-    32, 96, 0,  96, 6,
-    0,  96, 0,  64, 7,
-};
+//     64, 64, 96, 64, 4,
+//     96, 64, 96, 96, 5,
+//     96, 96, 64, 96, 4,
+//     64, 96, 64, 64, 5,
+
+//     0,  64, 32, 64, 6,
+//     32, 64, 32, 96, 7,
+//     32, 96, 0,  96, 6,
+//     0,  96, 0,  64, 7,
+// };
 
 
 // Used to initialize variables.
 void init()
 {
+
     // Precalculating sin and cos in degrees and storing the values.
     for (int x=0; x<360; x++) 
     {
@@ -447,8 +485,19 @@ void init()
         }
     }
 
-    // Get cursor position.
+    // Reset Key Values;
+    K.a = 0;
+    K.s = 0;
+    K.d = 0;
+    K.w = 0;
+    K.m = 0;
+    K.sl = 0;
+    K.sr = 0;
+    K.escape = 0;
 }
+
+
+
 
 int main(int argc, char* argv[])
 {
@@ -456,7 +505,7 @@ int main(int argc, char* argv[])
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
     glutInitWindowPosition(GLSW/2, GLSH/2);
     glutInitWindowSize(GLSW, GLSH);
-    glutCreateWindow("");
+    window = glutCreateWindow("");
     glPointSize(pixelScale); // Pixel Size.
     gluOrtho2D(0, GLSW, 0, GLSH); // Origin Bottom Left.
 
@@ -464,6 +513,7 @@ int main(int argc, char* argv[])
     printf("Running...\n");
 
     glutDisplayFunc(display);
+    glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF);
     glutKeyboardFunc(KeysDown);
     glutKeyboardUpFunc(KeysUp);
     glutMainLoop();
