@@ -37,7 +37,7 @@ typedef struct
 {
     int w,s,a,d;    // Move up, down, left, right.
     int sl,sr;      // Strafe left, right.
-    int m;          // Move up, down, look up, down.
+    int m;          // Look up, down.
 } keys; keys K;
 
 typedef struct
@@ -64,8 +64,10 @@ typedef struct
 {
     int ws, we;     // Wall number start and end.
     int z1, z2;     // Height of bottom and top.
-    int x, y;       // Center position for sector.
     int d;          // Add y distances to stort drawing order.
+    int c1, c2;     // Bottom and top color.
+    int surf[SW];   // To hold points for surfaces.
+    int surface;    // Is there a surface to draw.
 } sectors; sectors S[30];
 
 
@@ -177,7 +179,7 @@ void clipBehindPlayer (int *x1, int *y1, int *z1, int x2, int y2, int z2) // Cli
 }
 
 //             [Start Position] [Bottom Y Points] [Top Lines Points] [color]
-void drawWall (int x1, int x2, int b1, int b2, int t1, int t2, int c)
+void drawWall (int x1, int x2, int b1, int b2, int t1, int t2, int c, int s)
 {
     int x, y;
 
@@ -207,13 +209,19 @@ void drawWall (int x1, int x2, int b1, int b2, int t1, int t2, int c)
         if (y1 > SH-1) { y1 = SH - 1;} // Clip Right.
         if (y2 > SH-1) { y2 = SH - 1;} // Clip Right. 
         
+        // Surface first loop
+        if (S[s].surface == 1) { S[s].surf[x]=y1; continue;} // Save bottom points if we need to draw back wall because player is below the floor.
+        if (S[s].surface == 2) { S[s].surf[x]=y2; continue;} // Save top points of that back wall.
 
-        for (y = y1; y < y2; y++) { // This fills in the wall.
-            pixel(x, y, c);
+        // Surface second loop.
+        if (S[s].surface == -1) { //Back bottom wall points
+            for (y=S[s].surf[x]; y<y1; y++) { pixel(x,y,S[s].c1);} 
         }
+        if (S[s].surface == -2) { // Previous top back wall points
+            for (y=y2; y<S[s].surf[x]; y++) { pixel(x,y,S[s].c2);}
+        }
+        for (y=y1; y<y2; y++) { pixel(x,y,c);} // Normal front facing wall.
     }
-
-
 }
 
 int dist(int x1, int y1, int x2, int y2)
@@ -224,7 +232,7 @@ int dist(int x1, int y1, int x2, int y2)
 
 void draw3D()
 {
-    int s, w, wx[4], wy[4], wz[4]; // x,y,z for the wall.
+    int s, w, loop, wx[4], wy[4], wz[4]; // x,y,z for the wall.
     float CS=M.cos[P.a], SN=M.sin[P.a]; // Hold cos and sin value based on player rotation.
 
     // Order sectors by distance;
@@ -236,78 +244,97 @@ void draw3D()
         }
     }
 
+    // Draw Sectors.
     for (s=0;s<numSect;s++) {
 
-        S[s].d=0;   // Clear distance
-        for (w=S[s].ws;w<S[s].we;w++) {
+        S[s].d=0;   // Clear distance.
 
-            // Offset bottom 2 points by player.
-            int x1=W[w].x1-P.x, y1=W[w].y1-P.y;
-            int x2=W[w].x2-P.x, y2=W[w].y2-P.y;
+         if (P.z<S[s].z1) { S[s].surface=1;}     // Bottom surface.
+    else if (P.z>S[s].z2) { S[s].surface=2;}     // Top surface.
+    else                  { S[s].surface=0;}     // no surface.
 
-        /* --------------------World Position--------------------------- */
-            // World X position.
-            wx[0] = (x1 * CS) - (y1 * SN);
-            wx[1] = (x2 * CS) - (y2 * SN);
-            wx[2] = wx[0]; // Top line has the same x.
-            wx[3] = wx[1];
-            
 
-            // World Y position. (depth)
-            wy[0] = (y1 * CS) + (x1 * SN);
-            wy[1] = (y2 * CS) + (x2 * SN);
-            wy[2] = wy[0]; // Top line has the same y.
-            wy[3] = wy[1];
-            S[s].d+=dist(0,0, (wx[0] + wx[1])/2, (wy[0] + wy[1])/2 );   // Store this wall distance.
 
-            // World Z height.
-            wz[0] = S[s].z1-P.z + ((P.l*wy[0])/32.0);
-            wz[1] = S[s].z1-P.z + ((P.l*wy[1])/32.0);
-            wz[2] = wz[0] + S[s].z2;
-            wz[3] = wz[1] + S[s].z2;
-        /* --------------------World Position--------------------------- */
+        for (loop=0; loop<2; loop++) {
 
-        // Don't draw if behind player.
-        if (wy[0]<1 && wy[1]<1) { continue;} // Wall behind player
+            // Draw each sector's walls twice. 
+            // Once for the back walls and once again for the front walls. 
+            for (w=S[s].ws; w<S[s].we; w++) { 
 
-        // Point 1 behind player, clip.
-        if (wy[0]<1) {
-            clipBehindPlayer(&wx[0], &wy[0], &wz[0], wx[1], wy[1], wz[1]); // Bottom Line.
-            clipBehindPlayer(&wx[2], &wy[2], &wz[2], wx[3], wy[3], wz[3]); // Top Line.
+                // Offset bottom 2 points by player.
+                int x1=W[w].x1-P.x, y1=W[w].y1-P.y;
+                int x2=W[w].x2-P.x, y2=W[w].y2-P.y;
+
+                // Swap for surface.
+                if (loop == 0) {
+                    int swp=x1; x1=x2; x2=swp; swp=y1; y1=y2; y2=swp;
+                }
+
+            /* --------------------World Position--------------------------- */
+                // World X position.
+                wx[0] = (x1 * CS) - (y1 * SN);
+                wx[1] = (x2 * CS) - (y2 * SN);
+                wx[2] = wx[0]; // Top line has the same x.
+                wx[3] = wx[1];
+                
+
+                // World Y position. (depth)
+                wy[0] = (y1 * CS) + (x1 * SN);
+                wy[1] = (y2 * CS) + (x2 * SN);
+                wy[2] = wy[0]; // Top line has the same y.
+                wy[3] = wy[1];
+                S[s].d+=dist(0,0, (wx[0] + wx[1])/2, (wy[0] + wy[1])/2 );   // Store this wall distance.
+
+                // World Z height.
+                wz[0] = S[s].z1-P.z + ((P.l*wy[0])/32.0);
+                wz[1] = S[s].z1-P.z + ((P.l*wy[1])/32.0);
+                wz[2] = wz[0] + S[s].z2;
+                wz[3] = wz[1] + S[s].z2;
+            /* --------------------World Position--------------------------- */
+
+            // Don't draw if behind player.
+            if (wy[0]<1 && wy[1]<1) { continue;} // Wall behind player
+
+            // Point 1 behind player, clip.
+            if (wy[0]<1) {
+                clipBehindPlayer(&wx[0], &wy[0], &wz[0], wx[1], wy[1], wz[1]); // Bottom Line.
+                clipBehindPlayer(&wx[2], &wy[2], &wz[2], wx[3], wy[3], wz[3]); // Top Line.
+            }
+
+            // Point 2 behind player, clip.
+            if (wy[1] < 1) {
+                clipBehindPlayer(&wx[1], &wy[1], &wz[1], wx[0], wy[0], wz[0]); // Bottom Line.
+                clipBehindPlayer(&wx[3], &wy[3], &wz[3], wx[2], wy[2], wz[2]); // Top Line.
+            }
+
+            /* --------------------Screen Position--------------------------- */
+                // Screen x and screen y position.
+                // 200 : Field of view.
+                wx[0] = wx[0] * 200/wy[0] + SW2;
+                wy[0] = wz[0] * 200/wy[0] + SH2;
+                wx[1] = wx[1] * 200/wy[1] + SW2;
+                wy[1] = wz[1] * 200/wy[1] + SH2;
+                wx[2] = wx[2] * 200/wy[2] + SW2;
+                wy[2] = wz[2] * 200/wy[2] + SH2;
+                wx[3] = wx[3] * 200/wy[3] + SW2;
+                wy[3] = wz[3] * 200/wy[3] + SH2;
+            /* --------------------Screen Position--------------------------- */
+
+                // Draw points.
+                // if ( wx[0]>0 && wx[0]<SW && wy[0]>0 && wy[0]<SH ) {
+                //     pixel(wx[0], wy[0], 0);
+                // }
+
+                // if ( wx[1]>1 && wx[1]<SW && wy[1]>0 && wy[1]<SH ) {
+                //     pixel(wx[1], wy[1], 0);
+                // }
+
+                drawWall(wx[0], wx[1], wy[0], wy[1], wy[2], wy[3], W[w].c, s);
+            }
+
+            S[s].d/=(S[s].we-S[s].ws);  // Find average sector distance.
+            S[s].surface*=-1;           // Flip to negative to draw surface.
         }
-
-        // Point 2 behind player, clip.
-        if (wy[1] < 1) {
-            clipBehindPlayer(&wx[1], &wy[1], &wz[1], wx[0], wy[0], wz[0]); // Bottom Line.
-            clipBehindPlayer(&wx[3], &wy[3], &wz[3], wx[2], wy[2], wz[2]); // Top Line.
-        }
-
-        /* --------------------Screen Position--------------------------- */
-            // Screen x and screen y position.
-            // 200 : Field of view.
-            wx[0] = wx[0] * 200/wy[0] + SW2;
-            wy[0] = wz[0] * 200/wy[0] + SH2;
-            wx[1] = wx[1] * 200/wy[1] + SW2;
-            wy[1] = wz[1] * 200/wy[1] + SH2;
-            wx[2] = wx[2] * 200/wy[2] + SW2;
-            wy[2] = wz[2] * 200/wy[2] + SH2;
-            wx[3] = wx[3] * 200/wy[3] + SW2;
-            wy[3] = wz[3] * 200/wy[3] + SH2;
-        /* --------------------Screen Position--------------------------- */
-
-            // Draw points.
-            // if ( wx[0]>0 && wx[0]<SW && wy[0]>0 && wy[0]<SH ) {
-            //     pixel(wx[0], wy[0], 0);
-            // }
-
-            // if ( wx[1]>1 && wx[1]<SW && wy[1]>0 && wy[1]<SH ) {
-            //     pixel(wx[1], wy[1], 0);
-            // }
-
-            drawWall(wx[0], wx[1], wy[0], wy[1], wy[2], wy[3], W[w].c);
-        }
-
-        S[s].d/=(S[s].we-S[s].ws);  // Find average sector distance.
     }
 }
 
@@ -352,12 +379,13 @@ void KeysUp(unsigned char key, int x, int y)
     if (key == '.' == 1) { K.sl = 0; }
 }
 
+// Update this when updating struct sectors.
 int loadSectors[] =
-{ // wall start, wall end, z1 height, z2 height.
-    0,  4,  0,  40, // Sector 1
-    4,  8,  0,  40, // Sector 2
-    8,  12, 0,  40, // Sector 3
-    12, 16, 0,  40, // Sector 4
+{ // wall start, wall end, z1 height, z2 height, bottom color, top color
+    0,  4,  0,  40, 2,  3, // Sector 1
+    4,  8,  0,  40, 4,  5, // Sector 2
+    8,  12, 0,  40, 6,  7, // Sector 3
+    12, 16, 0,  40, 0,  1, // Sector 4
 };
 
 int loadWalls[] =
@@ -400,11 +428,13 @@ void init()
     // Load sectors
     int s, w, v1=0, v2=0;
     for (s=0; s<numSect; s++) {
-        S[s].ws=loadSectors[v1+0];      // Wall start number.
-        S[s].we=loadSectors[v1+1];      // Wall end number.
-        S[s].z1=loadSectors[v1+2];      // Sector bottom height.
-        S[s].z2=loadSectors[v1+3] - loadSectors[v1+2]; // Sector top height.
-        v1 += 4;
+        S[s].ws=loadSectors[v1+0];                      // Wall start number.
+        S[s].we=loadSectors[v1+1];                      // Wall end number.
+        S[s].z1=loadSectors[v1+2];                      // Sector bottom height.
+        S[s].z2=loadSectors[v1+3] - loadSectors[v1+2];  // Sector top height.
+        S[s].c1=loadSectors[v1+4];                      // Sector top color.
+        S[s].c2=loadSectors[v1+5];                      // Secot bottom color.
+        v1 += 6;
 
         // Laod Wall values.
         for (w=S[s].ws; w<S[s].we; w++) {
@@ -416,6 +446,8 @@ void init()
             v2+=5;
         }
     }
+
+    // Get cursor position.
 }
 
 int main(int argc, char* argv[])
