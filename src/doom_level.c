@@ -2,7 +2,7 @@
 
 //---doom level---
 int loadSectors[]=
-{
+{ // wall number start, wall number end, height of bottom and top, color of bottom and top.
 0,8, 40,50, 9,9,
 8,16, 0,40, 6,6,
 16,24, 80,110, 0,0,
@@ -16,7 +16,7 @@ int loadSectors[]=
 };
 
 int loadWalls[]=
-{
+{ // bottomline point (x1, y1), bottom line point (x2, y2), wall color
 160,228, 168,228, 4,
 168,228, 176,236, 5,
 176,236, 176,244, 4,
