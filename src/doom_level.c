@@ -1,5 +1,3 @@
-#include "../include/doom_level.h"
-
 //---doom level---
 int loadSectors[]=
 { // wall number start, wall number end, height of bottom and top, color of bottom and top.
@@ -13,6 +11,8 @@ int loadSectors[]=
 40,44, 0,30, 5,5,
 44,48, 30,110, 0,0,
 48,52, 30,110, 0,0,
+52, 56, 0,400, 1, 1,
+56, 62, 0,10, 4, 4,
 };
 
 int loadWalls[]=
@@ -69,4 +69,17 @@ int loadWalls[]=
 112,144, 112,152, 5,
 112,152, 104,152, 4,
 104,152, 104,144, 5,
+// Outter walls
+400,400, 400, -400, 9,
+400,-400, -400,-400, 9,
+-400,-400, -400,400, 9,
+-400,400, 400,400, 9,
+// platform
+20,0, 40,0, 5,
+40,0, 60,25, 5,
+60,25, 40,50, 5,
+40,50, 20,50, 5,
+20,50, 0,25, 5,
+0,25, 20,0, 5,
+
 };
