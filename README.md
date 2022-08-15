@@ -35,7 +35,7 @@ Run `./scripts/quick-start` to setup the host and start the application.
 
 ## DEMO
 
-![Alt Text](https://github.com/ruizmic0100/game-engine/tree/main/public/doom-opengl-engine-demo.gif "Engine Demo")
+![Alt Text](https://github.com/ruizmic0100/game-engine/blob/main/public/doom-opengl-engine-demo.gif "Engine Demo")
 
 ## Controls
 
